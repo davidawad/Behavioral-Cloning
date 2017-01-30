@@ -82,13 +82,13 @@ def create_generator(data_points):
      '-0.3452184' '0.1864116' '0' '27.59044']
     """
     for row in data_points:
-        # temp_item = np.zeros((1,) + INPUT_DIMENSIONS)
-
         # set temp_item numpy arrays for each camera
         # for i in range(CAMERA_INPUTS):
             # fpath to the image file
             # temp_item[i] = image_filter(row[i])
+        if row[0] is None or row[3] is None: continue
         temp_item = image_filter(row[0])
+
     yield temp_item, np.float32(row[3])
 
 
@@ -99,9 +99,9 @@ train_data, val_data = split_train_val(csv_driving_data='/data/driving_log.csv')
 train_samples = create_generator(train_data)
 val_samples = create_generator(val_data)
 
-# TODO debugging code for checking training item
-yolo = next(train_samples)
-print(yolo, yolo[0].shape, ndim(convert_to_tensor(yolo[0])))
+# NOTE debugging code for checking training item
+# yolo = next(train_samples)
+# print(yolo, yolo[0].shape, ndim(convert_to_tensor(yolo[0])))
 
 # MODEL
 model = Sequential()
@@ -137,7 +137,7 @@ model.add(Dropout(KEEP_PROB))
 model.add(Dense(10, init='he_normal', name="dense_10", activation='relu'))
 model.add(Dropout(KEEP_PROB))
 model.add(Dense(1, init='he_normal', name="dense_1"))
-model.summary()
+# model.summary()
 
 # Compile and train the model here.
 model.compile(loss='mean_squared_error',
