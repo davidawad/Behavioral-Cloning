@@ -36,10 +36,61 @@ tf.python.control_flow_ops = tf
 seed = 7
 np.random.seed(seed)
 
-import config
-from config import *
-
 # NOTE: the quality of the following code is highly suspect. have mercy.
+
+CROPPED_WIDTH = 320
+CROPPED_HEIGHT = 108
+COLOR_CHANNELS = 3
+
+RESIZE_DIMENSIONS = (CROPPED_WIDTH, CROPPED_HEIGHT)
+INPUT_DIMENSIONS = (1,) + RESIZE_DIMENSIONS + (COLOR_CHANNELS,)
+
+CAMERA_INPUTS = 1
+
+if CAMERA_INPUTS > 1:
+    INPUT_DIMENSIONS = (CAMERA_INPUTS,) + RESIZE_DIMENSIONS
+
+# hyperparameters to tune
+BATCH_SIZE = 128
+SAMPLES_PER_EPOCH = 10
+NB_EPOCHS = 10
+KEEP_PROB = 0.25
+LEARNING_RATE = 0.001
+
+
+# DATA PREPROCESSING
+def split_train_val(csv_driving_data, test_size=0.2):
+    csv_driving_data = normpath(os.getcwd() + csv_driving_data)
+    with open(csv_driving_data, 'r') as f:
+        reader = csv.reader(f)
+        driving_data = [row for row in reader][1:]
+
+    train_data, val_data = train_test_split(driving_data, test_size=test_size, random_state=1)
+    return np.array(train_data), np.array(val_data)
+
+
+def image_filter(fpath):
+    a = np.float32(imresize(scipy.ndimage.imread(normpath(fpath).replace(" ", ""), mode='RGB'), RESIZE_DIMENSIONS))
+    return a
+
+
+def create_generator(data_points):
+    """ data_point:
+    [ 'C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\center_2017_01_26_01_28_23_901.jpg'
+      'C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\left_2017_01_26_01_28_23_901.jpg'
+      'C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\right_2017_01_26_01_28_23_901.jpg'
+     '-0.3452184' '0.1864116' '0' '27.59044']
+    """
+    for row in data_points:
+        # temp_item = np.zeros((1,) + INPUT_DIMENSIONS)
+
+        # set temp_item numpy arrays for each camera
+        # for i in range(CAMERA_INPUTS):
+            # fpath to the image file
+            # temp_item[i] = image_filter(row[i])
+        temp_item = image_filter(row[0])
+    yield temp_item, np.float32(row[3])
+
 
 # read training data
 train_data, val_data = split_train_val(csv_driving_data='/data/driving_log.csv')
@@ -77,7 +128,7 @@ model.add(Dropout(KEEP_PROB))
 
 model.add(Flatten())
 
-# TODO remove 1164 layer
+# TODO try removing 1164 layer
 model.add(Dense(1164, init='he_normal', name="dense_1164", activation='relu'))
 model.add(Dense(100, init='he_normal', name="dense_100", activation='relu'))
 model.add(Dropout(KEEP_PROB))
@@ -101,7 +152,7 @@ model.fit_generator(train_samples,
                     validation_data=val_samples)
 
 # evaluate model on training set
-# score = model.evaluate_generator(val_samples, verbose=1)
+score = model.evaluate_generator(val_samples, verbose=1)
 
 # POST PROCESSING, SAVE MODEL TO DISK
 with open('model.json', 'w') as json_file:
