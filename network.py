@@ -52,7 +52,7 @@ if CAMERA_INPUTS > 1:
 
 # hyperparameters to tune
 BATCH_SIZE = 128
-SAMPLES_PER_EPOCH = 10
+SAMPLES_PER_EPOCH = 128
 NB_EPOCHS = 10
 KEEP_PROB = 0.25
 LEARNING_RATE = 0.001
@@ -74,7 +74,7 @@ def image_filter(fpath):
     return a
 
 
-def create_generator(data_points):
+def create_generator(data_points, batch_size=BATCH_SIZE):
     """ data_point:
     [ 'C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\center_2017_01_26_01_28_23_901.jpg'
       'C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\left_2017_01_26_01_28_23_901.jpg'
@@ -86,10 +86,8 @@ def create_generator(data_points):
         # for i in range(CAMERA_INPUTS):
             # fpath to the image file
             # temp_item[i] = image_filter(row[i])
-        if row[0] is None or row[3] is None: continue
         temp_item = image_filter(row[0])
-
-    yield temp_item, np.float32(row[3])
+        yield temp_item, np.float32(row[3])
 
 
 # read training data
