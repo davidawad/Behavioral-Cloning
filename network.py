@@ -14,7 +14,6 @@ import scipy
 from scipy import ndimage
 from scipy.misc import imresize
 
-# sklearn
 from sklearn.model_selection import train_test_split
 
 # keras contents
@@ -28,130 +27,83 @@ from keras.backend import ndim
 
 from tensorflow.python.framework.ops import convert_to_tensor
 
-
 import numpy as np
 # Fix obscure error with Keras and TensorFlow
 import tensorflow as tf
 tf.python.control_flow_ops = tf
 
-
-# NOTE: the quality of the following code is highly suspect. have mercy.
-
-# some constant stuff
-RESIZE_DIMENSIONS = (60, 220)
-batch_size = 128
-nb_classes = 10
-nb_epochs = 6
-
 # fix random seed for reproducibility
 seed = 7
 np.random.seed(seed)
 
+import config
+from config import *
 
-# DATA PREPROCESSING
-def split_train_val(csv_driving_data, test_size=0.2):
-    """
-    Splits the csv containing driving data into training and validation
-    :param csv_driving_data: file path of Udacity csv driving data
-    :return: train_split, validation_split
-    """
-    csv_driving_data = normpath(os.getcwd() + csv_driving_data)
-    with open(csv_driving_data, 'r') as f:
-        reader = csv.reader(f)
-        driving_data = [row for row in reader][1:]
+# NOTE: the quality of the following code is highly suspect. have mercy.
 
-    train_data, val_data = train_test_split(driving_data, test_size=test_size, random_state=1)
-
-    return np.array(train_data), np.array(val_data)
-
-
-def image_filter(fpath, resize_dimensions=RESIZE_DIMENSIONS):
-    # return imresize(scipy.ndimage.imread(normpath(fpath).replace(" ", ""), mode='RGB'), resize_dimensions)
-    return cv2.resize(scipy.ndimage.imread(normpath(fpath).replace(" ", ""), mode='RGB'), resize_dimensions)
-
-
-def create_generator(data_points, resize_dimensions=RESIZE_DIMENSIONS):
-    """ data_point:  [ 'C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\center_2017_01_26_01_28_23_901.jpg'
- ' C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\left_2017_01_26_01_28_23_901.jpg'
- ' C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\right_2017_01_26_01_28_23_901.jpg'
- ' -0.3452184' ' 0.1864116' ' 0' ' 27.59044']
-    """
-    for row in data_points:
-        temp_item = np.empty((3,) + resize_dimensions)
-
-        # set temp_item numpy arrays for each camera
-        for i in range(3):
-            temp_item[i] = image_filter(row[i])
-
-        yield convert_to_tensor(temp_item)
-
-
-def create_labels(data_points):
-    for row in data_points:
-        yield float(row[3])
-
-
+# read training data
 train_data, val_data = split_train_val(csv_driving_data='/data/driving_log.csv')
 
-train_samples, train_labels = create_generator(train_data), create_labels(train_data)
+# create testing and validation sets out of the training data
+train_samples = create_generator(train_data)
+val_samples = create_generator(val_data)
 
-val_samples, val_labels = create_generator(val_data), create_labels(val_data)
+# TODO debugging code for checking training item
+yolo = next(train_samples)
+print(yolo, yolo[0].shape, ndim(convert_to_tensor(yolo[0])))
 
-keep_prob = 0.5
-
+# MODEL
 model = Sequential()
 
-# TODO try lambda normalization
-# model.add(Lambda((lambda z: z / 127.5 - 1.), input_shape=(66, 200, 3)))
-model.add(BatchNormalization(input_shape=(3,) + RESIZE_DIMENSIONS, axis=1))
-# model.add(Convolution2D(24, 5, 5, border_mode='valid', subsample=(2, 2), input_shape=(66, 200, 3), name='conv1'))
-model.add(Convolution2D(24, 5, 5, border_mode='valid', subsample=(2, 2), name='conv1'))
-model.add(Activation('relu'))
-model.add(Dropout(keep_prob))
-model.add(Convolution2D(36, 5, 5, border_mode='valid', subsample=(2, 2), name='conv2'))
-model.add(Activation('relu'))
-model.add(Dropout(keep_prob))
-model.add(Convolution2D(48, 5, 5, border_mode='valid', subsample=(2, 2), name='conv3'))
-model.add(Activation('relu'))
-model.add(Dropout(keep_prob))
-model.add(Convolution2D(64, 3, 3, border_mode='valid', subsample=(1, 1), name='conv4'))
-model.add(Activation('relu'))
-model.add(Dropout(keep_prob))
-model.add(Convolution2D(64, 3, 3, border_mode='valid', subsample=(1, 1), name='conv5'))
-model.add(Activation('relu'))
-model.add(Dropout(keep_prob))
+# TODO try ELU
+model.add(Lambda(lambda x: x / 255. - .5, input_shape=(320, 108, 3)))
+# model.add(BatchNormalization(input_shape=(66,200, 3), axis=1))
+# model.add(Convolution2D(24, 5, 5, border_mode='valid', subsample=(2, 2), input_shape=INPUT_DIMENSIONS, name='conv1'))
+model.add(Convolution2D(24, 5, 5, border_mode='same', init='he_normal', subsample=(2, 2), name='conv1', activation="relu"))
+# model.add(Activation('relu'))
+model.add(Dropout(KEEP_PROB))
+model.add(Convolution2D(36, 5, 5, init='he_normal', subsample=(2, 2), name='conv2', activation="relu"))
+# model.add(Activation('relu'))
+model.add(Dropout(KEEP_PROB))
+model.add(Convolution2D(48, 5, 5, init='he_normal', subsample=(2, 2), name='conv3', activation="relu"))
+# model.add(Activation('relu'))
+model.add(Dropout(KEEP_PROB))
+model.add(Convolution2D(64, 3, 3, init='he_normal', subsample=(1, 1), name='conv4', activation="relu"))
+# model.add(Activation('relu'))
+model.add(Dropout(KEEP_PROB))
+model.add(Convolution2D(64, 3, 3, init='he_normal', subsample=(1, 1), name='conv5', activation="relu"))
+# model.add(Activation('relu'))
+model.add(Dropout(KEEP_PROB))
 
 model.add(Flatten())
 
-model.add(Dense(1164))
-model.add(Dense(100))
-model.add(Activation('relu'))
-model.add(Dense(50))
-model.add(Activation('relu'))
-model.add(Dense(10))
-model.add(Dense(1))
+# TODO remove 1164 layer
+model.add(Dense(1164, init='he_normal', name="dense_1164", activation='relu'))
+model.add(Dense(100, init='he_normal', name="dense_100", activation='relu'))
+model.add(Dropout(KEEP_PROB))
+model.add(Dense(50, init='he_normal', name="dense_50", activation='relu'))
+model.add(Dropout(KEEP_PROB))
+model.add(Dense(10, init='he_normal', name="dense_10", activation='relu'))
+model.add(Dropout(KEEP_PROB))
+model.add(Dense(1, init='he_normal', name="dense_1"))
 model.summary()
 
 # Compile and train the model here.
 model.compile(loss='mean_squared_error',
-              optimizer=Adam(lr=0.001),
+              optimizer=Adam(lr=LEARNING_RATE),
               metrics=['mean_squared_error'])
 
 model.fit_generator(train_samples,
-                    train_labels,
-                    batch_size=batch_size,
-                    nb_epoch=nb_epochs,
-                    verbose=1)
-
-# print(len(x_train), len(y_train), len(x_validation), len(y_validation))
+                    samples_per_epoch=SAMPLES_PER_EPOCH,
+                    nb_epoch=NB_EPOCHS,
+                    verbose=1,
+                    nb_val_samples=128,
+                    validation_data=val_samples)
 
 # evaluate model on training set
-score = model.evaluate_generator(val_samples, val_labels, verbose=0)
-
+# score = model.evaluate_generator(val_samples, verbose=1)
 
 # POST PROCESSING, SAVE MODEL TO DISK
-
-# save the model to disk
 with open('model.json', 'w') as json_file:
     json_file.write(model.to_json())
 
