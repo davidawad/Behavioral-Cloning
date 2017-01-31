@@ -1,11 +1,14 @@
 # @Author David Awad
 # code to create our neural network and save it as a model.
+from __future__ import unicode_literals
 import os
 import csv
 import cv2
 import sys
 import math
+import json
 import pickle
+import random
 import collections
 
 from os.path import normpath, join
@@ -15,6 +18,8 @@ from scipy import ndimage
 from scipy.misc import imresize
 
 from sklearn.model_selection import train_test_split
+
+
 
 # keras contents
 from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array
@@ -43,7 +48,7 @@ CROPPED_HEIGHT = 108
 COLOR_CHANNELS = 3
 
 RESIZE_DIMENSIONS = (CROPPED_WIDTH, CROPPED_HEIGHT)
-INPUT_DIMENSIONS = (1,) + RESIZE_DIMENSIONS + (COLOR_CHANNELS,)
+INPUT_DIMENSIONS = RESIZE_DIMENSIONS + (COLOR_CHANNELS,)
 
 CAMERA_INPUTS = 1
 
@@ -66,7 +71,7 @@ def split_train_val(csv_driving_data, test_size=0.2):
         driving_data = [row for row in reader][1:]
 
     train_data, val_data = train_test_split(driving_data, test_size=test_size, random_state=1)
-    return np.array(train_data), np.array(val_data)
+    return train_data, val_data
 
 
 def image_filter(fpath):
@@ -74,39 +79,39 @@ def image_filter(fpath):
     return a
 
 
-def create_generator(data_points, batch_size=BATCH_SIZE):
-    """ data_point:
+def create_generator(data_points, upper_bound, batch_size=BATCH_SIZE):
+    """ data_point: there are 11993 points total
     [ 'C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\center_2017_01_26_01_28_23_901.jpg'
       'C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\left_2017_01_26_01_28_23_901.jpg'
       'C:\\Users\\david\\Desktop\\sel_driving\\data\\IMG\\right_2017_01_26_01_28_23_901.jpg'
      '-0.3452184' '0.1864116' '0' '27.59044']
     """
-    for row in data_points:
-        # set temp_item numpy arrays for each camera
-        # for i in range(CAMERA_INPUTS):
-            # fpath to the image file
-            # temp_item[i] = image_filter(row[i])
-        temp_item = image_filter(row[0])
-        yield temp_item, np.float32(row[3])
+    print("UPPER BOUND", upper_bound)
+    randy = random.randint(0, upper_bound)
+    row = data_points[randy]
+    temp_item = image_filter(row[0])
+    yield np.array([temp_item]), np.float32([row[3]])
 
 
 # read training data
 train_data, val_data = split_train_val(csv_driving_data='/data/driving_log.csv')
 
 # create testing and validation sets out of the training data
-train_samples = create_generator(train_data)
-val_samples = create_generator(val_data)
+train_samples = create_generator(train_data, len(train_data))
+val_samples = create_generator(val_data, len(val_data))
 
 # NOTE debugging code for checking training item
-# yolo = next(train_samples)
-# print(yolo, yolo[0].shape, ndim(convert_to_tensor(yolo[0])))
+yolo = next(val_samples)
+print(yolo, yolo[0].shape, yolo[1].shape)
+
+# exit()
 
 # MODEL
 model = Sequential()
 
 # TODO try ELU
-model.add(Lambda(lambda x: x / 255. - .5, input_shape=(320, 108, 3)))
-# model.add(BatchNormalization(input_shape=(66,200, 3), axis=1))
+# model.add(Lambda(lambda x: x / 255. - .5, input_shape=INPUT_DIMENSIONS))
+model.add(BatchNormalization(input_shape=INPUT_DIMENSIONS, axis=1))
 # model.add(Convolution2D(24, 5, 5, border_mode='valid', subsample=(2, 2), input_shape=INPUT_DIMENSIONS, name='conv1'))
 model.add(Convolution2D(24, 5, 5, border_mode='same', init='he_normal', subsample=(2, 2), name='conv1', activation="relu"))
 # model.add(Activation('relu'))
@@ -145,12 +150,11 @@ model.compile(loss='mean_squared_error',
 model.fit_generator(train_samples,
                     samples_per_epoch=SAMPLES_PER_EPOCH,
                     nb_epoch=NB_EPOCHS,
-                    verbose=1,
                     nb_val_samples=128,
                     validation_data=val_samples)
 
-# evaluate model on training set
-score = model.evaluate_generator(val_samples, verbose=1)
+# evaluate model on training set, here "val_samples" specifies the number of elements to test on.
+score = model.evaluate_generator(val_samples, val_samples=200)
 
 # POST PROCESSING, SAVE MODEL TO DISK
 with open('model.json', 'w') as json_file:
@@ -161,4 +165,4 @@ model.save_weights('model.h5')
 
 print('Test score:', score[0])
 print('Test accuracy:', score[1])
-print('Saved model to disk.')
+print('Saved model to disk successfully')
