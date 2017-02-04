@@ -7,6 +7,7 @@ import socketio
 import eventlet
 import eventlet.wsgi
 import time
+import math
 from PIL import Image
 from PIL import ImageOps
 from flask import Flask, render_template
@@ -24,6 +25,9 @@ from scipy.misc import imresize
 import tensorflow as tf
 tf.python.control_flow_ops = tf
 
+# TODO share this in config file
+CROPPED_WIDTH = 200
+CROPPED_HEIGHT = 66
 
 sio = socketio.Server()
 app = Flask(__name__)
@@ -31,15 +35,7 @@ model = None
 prev_image_array = None
 
 
-def return_image(img, color_change=True):
-    # Take out the dash and horizon
-    img_shape = img.shape
-    img = img[60:img_shape[0] - 25, 0:img_shape[1]]
-    # assert crop_img.shape[0] == IMAGE_HEIGHT_CROP
-    # assert crop_img.shape[1] == IMAGE_WIDTH_CROP
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = (cv2.resize(img, (200, 66), interpolation=cv2.INTER_AREA))
-    return np.float32(img)
+from image_ops import *
 
 
 @sio.on('telemetry')
@@ -56,19 +52,24 @@ def telemetry(sid, data):
     image_array = np.asarray(image)
 
     # Preprocessing
-    image_array = return_image(image_array)
+    image_array = preprocess_image(image_array)
+    # adjust dim for keras
     image_array = image_array[None, :, :, :]
 
     # import pdb; pdb.set_trace()
 
-    # the model assumes that the features are just the images.
-    steering_angle = float(model.predict(image_array, batch_size=1)) * 10
+    # the model assumes that the features are just the image arrays.
+    steering_angle = float(model.predict(image_array, batch_size=1))
 
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
     throttle = 0.2
-    print(steering_angle, throttle)
-    # send_control(steering_angle, throttle)
+
+    # slow down for turns
+    # if abs(steering_angle) > .07:
+    #     throttle = .05
+    print('Angle: {0:02f}, Throttle: {1:02f}'.format(steering_angle, throttle))
     send_control(steering_angle, throttle)
+
 
 @sio.on('connect')
 def connect(sid, environ):
