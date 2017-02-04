@@ -122,7 +122,7 @@ def create_generator(data_points, batch_size=BATCH_SIZE):
             image, angle = trans_image(image, angle, 100)
 
             # add random shadow
-            image = add_random_shadow(image)
+            image = add_random_shadows(image)
 
             # augment brightness
             image = augment_brightness_camera_images(image)
