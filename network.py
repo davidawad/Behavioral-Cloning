@@ -57,8 +57,8 @@ CAMERA_INPUTS = 1
 
 # hyperparameters to tune
 BATCH_SIZE = 64          # number of samples in a batch of data
-SAMPLES_PER_EPOCH = 512  # number of times the generator will yield
-NB_EPOCHS = 5            # number of epochs to train for
+SAMPLES_PER_EPOCH = 1024 # number of times the generator will yield
+NB_EPOCHS = 10           # number of epochs to train for
 KEEP_PROB = 0.25         # keep probability for hinton's dropout
 LEARNING_RATE = 0.0001   # learning rate for convnet
 ALPHA = 1.0              # ELU alpha param
@@ -94,7 +94,7 @@ def create_generator(data_points, batch_size=BATCH_SIZE):
 
             # TODO make threshold a constant
             # ignore low angles
-            min_ang_threshold = 0.2
+            min_ang_threshold = 0.4
             if abs(angle) < .1:
                 # for every small angle, flip a coin to see if we use it.
                 rand = np.random.uniform()
@@ -158,6 +158,7 @@ val_samples = create_generator(val_data)
 
 # NVIDIA MODEL
 def nvidia_model():
+    print('Nvidia Model...')
     model = Sequential()
     # model.add(Lambda(lambda x: x / 255. - .5, input_shape=INPUT_DIMENSIONS))
 #     model.add(BatchNormalization(input_shape=INPUT_DIMENSIONS, axis=1))
@@ -222,7 +223,7 @@ model = comma_model()
 model.compile(loss='mse', optimizer=Adam(lr=LEARNING_RATE))
 
 model.fit_generator(train_samples,
-                    samples_per_epoch=len(train_data),
+                    samples_per_epoch=SAMPLES_PER_EPOCH,
                     nb_epoch=NB_EPOCHS,
                     nb_val_samples=128,
                     validation_data=val_samples)
