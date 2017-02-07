@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import os
 import csv
 import cv2
-import sys
 import math
 import json
 import pickle
@@ -18,7 +17,6 @@ from scipy import ndimage
 from scipy.misc import imresize
 
 from sklearn.model_selection import train_test_split
-
 
 # keras contents
 from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array
@@ -43,8 +41,6 @@ tf.python.control_flow_ops = tf
 seed = 7
 np.random.seed(seed)
 
-# NOTE: the quality of the following code is highly suspect. have mercy.
-
 # Image dimensions to resize to
 CROPPED_WIDTH = 200
 CROPPED_HEIGHT = 66
@@ -56,12 +52,12 @@ INPUT_DIMENSIONS = RESIZE_DIMENSIONS + (COLOR_CHANNELS,)
 CAMERA_INPUTS = 1
 
 # hyperparameters to tune
-BATCH_SIZE = 64          # number of samples in a batch of data
-SAMPLES_PER_EPOCH = 1024 # number of times the generator will yield
-NB_EPOCHS = 10           # number of epochs to train for
-KEEP_PROB = 0.25         # keep probability for hinton's dropout
-LEARNING_RATE = 0.0001   # learning rate for convnet
-ALPHA = 1.0              # ELU alpha param
+BATCH_SIZE = 64           # number of samples in a batch of data
+SAMPLES_PER_EPOCH = 1024  # number of times the generator will yield
+NB_EPOCHS = 50            # number of epochs to train for
+KEEP_PROB = 0.25          # keep probability for hinton's dropout
+LEARNING_RATE = 0.0001    # learning rate for convnet
+ALPHA = 1.0               # ELU alpha param
 
 
 def split_train_val(csv_driving_data, test_size=0.2):
@@ -74,7 +70,45 @@ def split_train_val(csv_driving_data, test_size=0.2):
         return train_data, val_data
 
 
+def create_valid_generator(data_points, batch_size=BATCH_SIZE):
+    """
+    generator for purely vavlidation data
+    """
+    # propagate batch_images and batch_steering
+    batch_images = np.zeros((batch_size, CROPPED_HEIGHT, CROPPED_WIDTH, 3))
+    batch_steering = np.zeros(batch_size)
+
+    while True:
+        batch_filled = 0
+        # TODO change to .shape
+        while batch_filled < batch_size:
+
+            # grab a random training example
+            row = data_points[np.random.randint(len(data_points))]
+
+            impath = row[0]  # set image path
+            angle = float(row[3])           # read steering angle
+
+            # read our image from the camera of choice
+            impath = os.path.normpath(os.getcwd() + "/data/" + impath).replace(" ", "")
+            # impath = os.path.normpath(impath).replace(" ", "")
+            image = cv2.imread(impath)
+
+            if image is None or angle == 0.0: continue
+
+            image = preprocess_image(image)
+
+            # fill batch of data
+            batch_images[batch_filled] = image
+            batch_steering[batch_filled] = angle
+            batch_filled += 1
+        yield batch_images, batch_steering
+
+
 def create_generator(data_points, batch_size=BATCH_SIZE):
+    """
+    generator for training data
+    """
     # propagate batch_images and batch_steering
     batch_images = np.zeros((batch_size, CROPPED_HEIGHT, CROPPED_WIDTH, 3))
     batch_steering = np.zeros(batch_size)
@@ -94,7 +128,7 @@ def create_generator(data_points, batch_size=BATCH_SIZE):
 
             # TODO make threshold a constant
             # ignore low angles
-            min_ang_threshold = 0.4
+            min_ang_threshold = 0.8
             if abs(angle) < .1:
                 # for every small angle, flip a coin to see if we use it.
                 rand = np.random.uniform()
@@ -113,9 +147,12 @@ def create_generator(data_points, batch_size=BATCH_SIZE):
                 shift_ang = -.30
 
             # read our image from the camera of choice
-            # impath = os.path.normpath(os.getcwd() + "/data/" + impath).replace(" ", "")
-            impath = os.path.normpath(impath).replace(" ", "")
+            impath = os.path.normpath(os.getcwd() + "/data/" + impath).replace(" ", "")
+            # impath = os.path.normpath(impath).replace(" ", "")
             image = cv2.imread(impath)
+
+            if image is None or angle == 0.0: continue
+
             angle = angle + shift_ang
 
             # translate the image randomly to better simulate road conditions
@@ -149,12 +186,13 @@ train_data, val_data = split_train_val(csv_driving_data='/data/driving_log.csv')
 # create our generators for keras.
 train_samples = create_generator(train_data)
 
-val_samples = create_generator(val_data)
+val_samples = create_valid_generator(val_data)
 
 # NOTE debugging code for checking training item
 # yolo = next(val_samples)
 # print(yolo, yolo[0], yolo[1], yolo[0].dtype, yolo[1].dtype)
 # exit()
+
 
 # NVIDIA MODEL
 def nvidia_model():

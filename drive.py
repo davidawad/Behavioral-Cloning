@@ -78,6 +78,12 @@ def connect(sid, environ):
     send_control(0, 0)
 
 
+@sio.on('disconnect')
+def disconnect():
+    print('Client disconnected')
+    exit()
+
+
 def send_control(steering_angle, throttle):
     sio.emit("steer", data={
     'steering_angle': steering_angle.__str__(),
