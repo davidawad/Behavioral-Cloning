@@ -25,18 +25,15 @@ from scipy.misc import imresize
 import tensorflow as tf
 tf.python.control_flow_ops = tf
 
-# TODO share this in config file
-CROPPED_WIDTH = 200
-CROPPED_HEIGHT = 66
+
+# user level imports
+from ops import *
+from config import *
 
 sio = socketio.Server()
 app = Flask(__name__)
 model = None
 prev_image_array = None
-
-
-from image_ops import *
-
 
 @sio.on('telemetry')
 def telemetry(sid, data):
@@ -51,8 +48,12 @@ def telemetry(sid, data):
     image = Image.open(BytesIO(base64.b64decode(imgString)))
     image_array = np.asarray(image)
 
-    # Preprocessing
+    # simulation sends rgb images to the model, cv imread takes BGR
+    image_array = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
+
+    # Preprocessing for our image
     image_array = preprocess_image(image_array)
+
     # adjust dim for keras
     image_array = image_array[None, :, :, :]
 
@@ -77,7 +78,7 @@ def connect(sid, environ):
     print("connect ", sid)
     send_control(0, 0)
 
-
+# TODO this should end the process after the connection has closed.
 @sio.on('disconnect')
 def disconnect():
     print('Client disconnected')
