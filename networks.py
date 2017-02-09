@@ -1,6 +1,5 @@
 # @Author David Awad
 # code to create our neural network and save it as a model.
-# from __future__ import unicode_literals
 import os
 import csv
 import cv2
@@ -108,38 +107,37 @@ def comma_model():
 
 def experimental_cnn():
     model = Sequential()
-    # 2 CNNs blocks comprised of 32 filters of size 3x3.
+
     model.add(ZeroPadding2D((1, 1), input_shape=INPUT_DIMENSIONS))
     model.add(Convolution2D(32, 3, 3, activation='elu'))
+
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(32, 3, 3, activation='elu'))
-    # Maxpooling
+
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-    # 2 CNNs blocks comprised of 64 filters of size 3x3.
     model.add(ZeroPadding2D((1, 1), input_shape=INPUT_DIMENSIONS))
     model.add(Convolution2D(64, 3, 3, activation='elu'))
+
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(64, 3, 3, activation='elu'))
-    # Maxpooling + Dropout to avoid overfitting
+
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
     model.add(Dropout(0.5))
 
-    # 2 CNNs blocks comprised of 128 filters of size 3x3.
     model.add(ZeroPadding2D((1, 1), input_shape=INPUT_DIMENSIONS))
     model.add(Convolution2D(128, 3, 3, activation='elu'))
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(128, 3, 3, activation='elu'))
-    # Last Maxpooling. We went from an image (64, 64, 3), to an array of shape (8, 8, 128)
+
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-    # Fully connected layers part.
     model.add(Flatten(input_shape=(3, CROPPED_WIDTH, CROPPED_HEIGHT)))
     model.add(Dense(256, activation='elu'))
-    # Dropout here to avoid overfitting
+
     model.add(Dropout(0.5))
     model.add(Dense(64, activation='elu'))
-    # Last Dropout to avoid overfitting
+
     model.add(Dropout(0.5))
     model.add(Dense(16, activation='elu'))
     model.add(Dense(1))
